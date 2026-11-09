@@ -19,13 +19,13 @@ window.SHOP = {
   phoneDisplay: '',          // e.g. '+91 98765 43210'
   email: '',                 // e.g. 'hello@yourshop.in'
   instagram: '',             // full link, e.g. 'https://instagram.com/yourshop'
-  address: '',               // e.g. 'Jayanagar 4th Block, Bengaluru'
+  address: 'Hunasakatte Junction, Bhadravati – 577115',
   hours: '',                 // e.g. 'Mon–Sat, 10 am – 8 pm'
 
   // ---- UPI payments (optional) ----------------------------------------
   // When upiId is set, customers who pick UPI get your UPI ID and a
   // "Pay with UPI app" button after placing the order.
-  upiId: '',                 // e.g. 'yourname@okaxis'
+  upiId: '8618621589@ybl',
   upiName: '',               // name shown inside the UPI app
   upiQr: '',                 // optional photo of your UPI QR, e.g. 'images/upi-qr.png'
 
