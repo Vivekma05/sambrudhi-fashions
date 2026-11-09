@@ -135,17 +135,25 @@ section[id] { scroll-margin-top: calc(var(--header-h) + 8px); }
 }
 .header-in { display: flex; align-items: center; gap: 8px; height: var(--header-h); }
 .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; margin-right: auto; min-width: 0; }
-.logo-mark { width: 34px; height: 34px; flex: none; }
+.logo-mark { width: 40px; height: 40px; flex: none; object-fit: contain; }
+.footer-mark { width: 56px; height: 56px; margin-bottom: 12px; }
+.menu-logo-text { margin-right: auto; margin-left: 10px; }
 .logo-text { display: flex; flex-direction: column; min-width: 0; }
 .logo-name { font-family: var(--serif); font-weight: 700; font-size: 22px; line-height: 1; color: var(--maroon); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .logo-sub { font-size: 10px; letter-spacing: .24em; text-transform: uppercase; color: var(--gold-ink); margin-top: 3px; white-space: nowrap; }
 @media (min-width: 480px) { .logo-name { font-size: 25px; } }
 @media (max-width: 479px) {
-  .logo-mark, #searchBtn { display: none; }  /* phones: room for the full shop name; search lives in the shop section */
-  .logo-name { font-size: 21px; }
+  #searchBtn { display: none; }  /* phones: room for the full shop name; search lives in the shop section */
+  .logo { gap: 8px; }
+  .logo-mark { width: 34px; height: 34px; }
+  .logo-name { font-size: 20px; }
   .logo-sub { font-size: 9.5px; }
 }
-@media (max-width: 359px) { .logo-name { font-size: 18px; } }
+@media (max-width: 379px) {
+  .header-in { gap: 4px; }
+  .logo-mark { width: 30px; height: 30px; }
+  .logo-name { font-size: 18px; }
+}
 .nav { gap: 4px; margin-right: 12px; }
 .nav a { text-decoration: none; font-size: 15px; color: var(--ink-2); padding: 8px 12px; border-radius: 999px; transition: color .2s, background-color .2s; }
 .nav a:hover { color: var(--maroon); background: var(--sand); }
