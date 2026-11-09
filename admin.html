@@ -97,7 +97,10 @@
           <h1>Products</h1>
           <p class="muted" id="countLine"></p>
         </div>
-        <button type="button" class="btn btn-primary" id="addBtn"><span data-i="plus"></span> Add product</button>
+        <div class="top-actions">
+          <button type="button" class="btn btn-outline" id="catsBtn"><span data-i="tag"></span> Categories</button>
+          <button type="button" class="btn btn-primary" id="addBtn"><span data-i="plus"></span> Add product</button>
+        </div>
       </div>
 
       <div class="sample-banner" id="sampleBanner" hidden>
@@ -127,11 +130,7 @@
 
       <fieldset class="ed-block">
         <legend>Category</legend>
-        <div class="seg" id="edCat">
-          <label><input type="radio" name="category" value="sarees" checked><span>Saree</span></label>
-          <label><input type="radio" name="category" value="bangles"><span>Bangles</span></label>
-          <label><input type="radio" name="category" value="combos"><span>Combo</span></label>
-        </div>
+        <div class="seg" id="edCat"></div>
       </fieldset>
 
       <div class="ed-block">
@@ -171,7 +170,7 @@
       </div>
 
       <fieldset class="ed-block" id="sizeBlock">
-        <legend>Bangle sizes available</legend>
+        <legend>Sizes available <small>(customers must pick one)</small></legend>
         <div class="checks" id="edSizes"></div>
       </fieldset>
 
@@ -200,6 +199,66 @@
       <div class="ed-actions">
         <button type="button" class="btn btn-outline danger" id="edDelete" hidden><span data-i="trash"></span> Delete</button>
         <button type="submit" class="btn btn-primary grow" id="edSave">Save product</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ---------------- categories ---------------- -->
+  <dialog class="modal cats-dialog" id="catsDialog" aria-labelledby="catsTitle">
+    <button type="button" class="modal-close" data-close aria-label="Close"><span data-i="close"></span></button>
+    <div class="ed-wrap">
+      <h2 id="catsTitle">Categories</h2>
+      <p class="muted cats-intro">These are the sections of your shop: the menu, the tabs and the category cards. Categories with no products stay hidden from customers.</p>
+      <div class="cat-list" id="catList"></div>
+      <div class="ed-actions">
+        <button type="button" class="btn btn-primary grow" id="addCatBtn"><span data-i="plus"></span> Add category</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="modal cat-editor" id="catEditor" aria-labelledby="ceTitle">
+    <button type="button" class="modal-close" data-close aria-label="Close"><span data-i="close"></span></button>
+    <form id="catForm" class="ed-wrap" novalidate>
+      <h2 id="ceTitle">Add category</h2>
+      <div class="field">
+        <label for="ceName">Category name</label>
+        <input id="ceName" name="name" required maxlength="30" placeholder="e.g. Kurtis, Blouses, Earrings">
+      </div>
+      <div class="field">
+        <label for="ceDesc">Short description <small>(shown on the category card · optional)</small></label>
+        <input id="ceDesc" name="description" maxlength="60" placeholder="e.g. Cotton & rayon kurtis for every day">
+      </div>
+      <div class="field">
+        <label for="ceSizes">Sizes <small>(separate with commas · leave empty if no sizes)</small></label>
+        <input id="ceSizes" name="sizes" maxlength="120" placeholder="e.g. S, M, L, XL, XXL">
+        <div class="presets">
+          <button type="button" class="chip" data-preset="S, M, L, XL, XXL">Clothing S–XXL</button>
+          <button type="button" class="chip" data-preset="2.2, 2.4, 2.6, 2.8, 2.10">Bangles 2.2–2.10</button>
+          <button type="button" class="chip" data-preset="32, 34, 36, 38, 40, 42">Blouse 32–42</button>
+          <button type="button" class="chip" data-preset="Free size">Free size</button>
+          <button type="button" class="chip" data-preset="">No sizes</button>
+        </div>
+      </div>
+      <fieldset class="ed-block">
+        <legend>Picture for items without a photo</legend>
+        <div class="seg seg-wrap" id="ceArt">
+          <label><input type="radio" name="art" value="saree"><span>Saree</span></label>
+          <label><input type="radio" name="art" value="bangles"><span>Bangles</span></label>
+          <label><input type="radio" name="art" value="combo"><span>Saree + bangles</span></label>
+          <label><input type="radio" name="art" value="plain" checked><span>Simple pattern</span></label>
+        </div>
+      </fieldset>
+      <div class="ed-block delete-box" id="ceDeleteBox" hidden>
+        <p id="ceDeleteText"></p>
+        <div class="field" id="ceMoveField">
+          <label for="ceMoveTo">Move its products to</label>
+          <select id="ceMoveTo" class="select"></select>
+        </div>
+        <button type="button" class="btn btn-outline danger btn-block" id="ceDelete"><span data-i="trash"></span> Delete this category</button>
+      </div>
+      <p class="form-error" id="ceError" hidden></p>
+      <div class="ed-actions">
+        <button type="submit" class="btn btn-primary grow" id="ceSave">Save category</button>
       </div>
     </form>
   </dialog>

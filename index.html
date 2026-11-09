@@ -30,9 +30,7 @@
         <span class="logo-text"><span class="logo-name" data-shop-name>Samruddhi Fashion</span><span class="logo-sub" data-shop-tagline>Sarees · Bangles</span></span>
       </a>
       <nav class="nav only-desktop" aria-label="Main">
-        <a href="#shop" data-go="sarees">Sarees</a>
-        <a href="#shop" data-go="bangles">Bangles</a>
-        <a href="#shop" data-go="combos">Combos</a>
+        <span class="nav-cats" id="navCats"><a href="#shop" data-go="all">Shop</a></span>
         <a href="#about">About</a>
         <a href="#faq">Help</a>
         <a href="#contact">Contact</a>
@@ -54,8 +52,8 @@
           <h1>Sarees and bangles, <em>matched</em> for every celebration</h1>
           <p class="lead">Silk, cotton and designer drapes — with bangles picked to complete each look. Choose in a few taps and confirm your order on WhatsApp.</p>
           <div class="hero-cta">
-            <a class="btn btn-primary" href="#shop" data-go="sarees">Shop sarees</a>
-            <a class="btn btn-ghost" href="#shop" data-go="bangles">Shop bangles</a>
+            <a class="btn btn-primary" href="#shop" data-go="all" id="heroCta1">Shop now</a>
+            <a class="btn btn-ghost" href="#shop" data-go="all" id="heroCta2" hidden>Shop</a>
           </div>
           <ul class="hero-points" id="heroPoints"></ul>
         </div>
@@ -92,7 +90,7 @@
       <div class="wrap">
         <div class="section-head">
           <p class="eyebrow">The collection</p>
-          <h2>Sarees, bangles &amp; combos</h2>
+          <h2 id="shopHeading">Shop the collection</h2>
         </div>
 
         <div class="toolbar">
@@ -131,7 +129,7 @@
           <p class="eyebrow">Complete the look</p>
           <h2>Every saree comes with bangles to match</h2>
           <p>Open any saree to see bangles picked in matching colours — or save more with our ready-made saree and bangle combos, priced together.</p>
-          <a class="btn btn-primary" href="#shop" data-go="combos">Shop combos</a>
+          <a class="btn btn-primary" href="#shop" data-go="all" id="matchCta">Shop combos</a>
         </div>
       </div>
     </section>
@@ -195,10 +193,8 @@
         </div>
         <div>
           <h4>Shop</h4>
-          <ul>
-            <li><a href="#shop" data-go="sarees">Sarees</a></li>
-            <li><a href="#shop" data-go="bangles">Bangles</a></li>
-            <li><a href="#shop" data-go="combos">Combos</a></li>
+          <ul id="footShop">
+            <li><a href="#shop" data-go="all">All products</a></li>
             <li><a href="#shop" data-go="wishlist">Wishlist</a></li>
           </ul>
         </div>
@@ -308,9 +304,7 @@
       <button type="button" class="icon-btn" data-close aria-label="Close menu"><span data-i="close"></span></button>
     </div>
     <ul class="menu-links">
-      <li><a href="#shop" data-go="sarees">Sarees</a></li>
-      <li><a href="#shop" data-go="bangles">Bangles</a></li>
-      <li><a href="#shop" data-go="combos">Combos</a></li>
+      <li id="menuCats"><a href="#shop" data-go="all">All products</a></li>
       <li><a href="#shop" data-go="wishlist">Wishlist</a></li>
       <li><a href="#about" data-close>About us</a></li>
       <li><a href="#faq" data-close>Help &amp; FAQ</a></li>

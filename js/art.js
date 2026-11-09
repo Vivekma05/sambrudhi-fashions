@@ -231,11 +231,39 @@ window.Art = (() => {
       bg.body + `<g transform="translate(-14 -18)">${s.body}</g><g transform="translate(176 228) scale(.56)">${b.body}</g>`);
   }
 
+  // Placeholder for categories that have no special drawing (kurtis, jewellery, …)
+  function plain(a = {}) {
+    const id = uid(), c = a.color || '#7a1230', bg = backdrop(id, c);
+    let petals = '';
+    for (let i = 0; i < 12; i++) petals += `<ellipse cy="-58" rx="13" ry="30" transform="rotate(${i * 30})"/>`;
+    const label = String(a.label || '').replace(/[<>&"]/g, '').slice(0, 18);
+    return wrap('0 0 400 500', bg.defs + shadowGrad(id),
+      bg.body +
+      `<ellipse cx="200" cy="420" rx="150" ry="22" fill="url(#${id}sh)"/>` +
+      `<g transform="translate(200 230)"><circle r="112" fill="${c}"/><circle r="112" fill="none" stroke="${GOLD}" stroke-width="3"/>` +
+      `<g fill="none" stroke="${GOLD_L}" stroke-width="1.6" opacity=".9">${petals}<circle r="92" stroke-dasharray="1.5 6" stroke-linecap="round"/><circle r="26"/></g>` +
+      `<circle r="10" fill="${GOLD}"/></g>` +
+      (label ? `<text x="200" y="395" text-anchor="middle" font-family="Georgia, serif" font-size="26" fill="${dark(c, 0.25)}" letter-spacing="2">${label}</text>` : ''));
+  }
+
+  // Which drawing a product gets: from the shape of its art settings, then its category
+  function kindOf(p) {
+    const a = p.art || {};
+    if (a.kind) return a.kind;
+    if (a.saree && a.bangles) return 'combo';
+    if (a.style) return 'bangles';
+    if (a.body) return 'saree';
+    return { sarees: 'saree', bangles: 'bangles', combos: 'combo' }[p.category] || 'plain';
+  }
+
   function draw(p) {
     const a = p.art || {};
-    if (p.category === 'bangles') return bangles(a);
-    if (p.category === 'combos' && a.saree && a.bangles) return combo(a);
-    return saree(a.saree || a);
+    switch (kindOf(p)) {
+      case 'bangles': return bangles(a);
+      case 'combo': return a.saree && a.bangles ? combo(a) : saree(a.saree || a);
+      case 'saree': return saree(a.saree || a);
+      default: return plain(a);
+    }
   }
 
   const sparkle = (x, y, s, o = 1) =>
@@ -275,5 +303,5 @@ window.Art = (() => {
     return `<svg viewBox="-70 -70 140 140" aria-hidden="true" focusable="false"><g fill="none" stroke="${color}" stroke-width="1.3">${p}${q}<circle r="62"/><circle r="66" stroke-dasharray="1.5 5" stroke-linecap="round"/><circle r="30"/><circle r="7"/></g></svg>`;
   }
 
-  return { draw, saree, bangles, combo, hero, mandala };
+  return { draw, saree, bangles, combo, plain, hero, mandala };
 })();

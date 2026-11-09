@@ -136,7 +136,7 @@ section[id] { scroll-margin-top: calc(var(--header-h) + 8px); }
 .header-in { display: flex; align-items: center; gap: 8px; height: var(--header-h); }
 .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; margin-right: auto; min-width: 0; }
 .logo-mark { width: 40px; height: 40px; flex: none; object-fit: contain; }
-.footer-mark { width: 56px; height: 56px; margin-bottom: 12px; }
+.footer-mark { width: 72px; height: 72px; margin-bottom: 14px; padding: 5px; background: var(--cream); border-radius: 18px; }
 .menu-logo-text { margin-right: auto; margin-left: 10px; }
 .logo-text { display: flex; flex-direction: column; min-width: 0; }
 .logo-name { font-family: var(--serif); font-weight: 700; font-size: 22px; line-height: 1; color: var(--maroon); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -208,7 +208,8 @@ section[id] { scroll-margin-top: calc(var(--header-h) + 8px); }
 
 /* ---- categories ------------------------------------------------------------- */
 .cat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-@media (min-width: 700px) { .cat-grid { gap: 20px; } }
+@media (min-width: 700px) { .cat-grid { gap: 20px; } .cat-grid.many { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); } }
+.nav-cats { display: contents; }
 .cat-card {
   display: flex; flex-direction: column; text-decoration: none; background: var(--ivory);
   border: 1px solid var(--line); border-radius: var(--r); overflow: hidden;

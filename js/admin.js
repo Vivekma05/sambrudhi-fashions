@@ -22,9 +22,15 @@
   const MAX_PIN_FAILS = 5;
   const LOCK_AFTER_MS = 10 * 60 * 1000;          // lock again after 10 minutes away from the page
   const MAX_PHOTOS = 6;
-  const CATS = { sarees: 'Saree', bangles: 'Bangles', combos: 'Combo' };
   const OCCASIONS = ['Wedding', 'Festive', 'Party', 'Office', 'Daily'];
-  const SIZES = ['2.2', '2.4', '2.6', '2.8', '2.10'];
+  const BANGLE_SIZES = ['2.2', '2.4', '2.6', '2.8', '2.10'];
+  // used only if the catalogue file has no categories yet
+  const DEFAULT_CATS = [
+    { id: 'sarees', name: 'Sarees', description: 'Silk, cotton, georgette & more', art: 'saree', sizes: [] },
+    { id: 'bangles', name: 'Bangles', description: 'Glass, kundan, thread & lac', art: 'bangles', sizes: BANGLE_SIZES },
+    { id: 'combos', name: 'Combos', description: 'Saree + matching bangles', art: 'combo', sizes: BANGLE_SIZES }
+  ];
+  const ART_KINDS = { saree: 'Saree picture', bangles: 'Bangles picture', combo: 'Saree + bangles picture', plain: 'Simple pattern' };
   const COLORS = {
     red: ['Red', '#c0142f'], maroon: ['Maroon', '#6e1028'], pink: ['Pink', '#e0457b'],
     orange: ['Orange', '#e8743b'], yellow: ['Yellow', '#e3b10f'], green: ['Green', '#157a55'],
@@ -48,7 +54,10 @@
   }
   const REPO = detectRepo();
 
-  const st = { token: '', branch: 'main', head: '', products: [], cat: 'all', q: '' };
+  const st = { token: '', branch: 'main', head: '', categories: [], products: [], cat: 'all', q: '' };
+  const catOf = id => st.categories.find(c => c.id === id);
+  const catLabel = id => (catOf(id) || {}).name || id;
+  const countIn = id => st.products.filter(p => p.category === id).length;
   const ls = {
     get(k) { try { return localStorage.getItem(k); } catch { return null; } },
     set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch { /* storage blocked */ } }
@@ -92,7 +101,8 @@
     trash: svgI('<path d="M4 7h16M9 7V5h6v2M6.5 7l1 12h9l1-12M10 11v5M14 11v5"/>'),
     camera: svgI('<path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>'),
     star: svgI('<path d="M12 4l2.4 5 5.4.6-4 3.7 1.1 5.4L12 16l-4.9 2.7 1.1-5.4-4-3.7 5.4-.6z"/>'),
-    lock: svgI('<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>')
+    lock: svgI('<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>'),
+    tag: svgI('<path d="M3.5 12.5V4.5h8l9 9-8 8z"/><circle cx="8" cy="9" r="1.5"/>')
   };
 
   // ---- GitHub API -------------------------------------------------------------
@@ -122,21 +132,30 @@
 
   const fromB64 = b64 => new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/\s/g, '')), c => c.charCodeAt(0)));
 
-  function parseProducts(text) {
+  // The catalogue file holds { categories, products } as JSON between /*DATA*/ and /*END*/.
+  function parseCatalog(text) {
     const a = text.indexOf('/*DATA*/'), b = text.lastIndexOf('/*END*/');
     if (a < 0 || b < a) throw Object.assign(new Error('js/products.js is not in the admin format (the /*DATA*/ … /*END*/ markers are missing).'), { friendly: true });
-    return JSON.parse(text.slice(a + 8, b));
+    const data = JSON.parse(text.slice(a + 8, b));
+    const fresh = () => DEFAULT_CATS.map(c => ({ ...c, sizes: [...c.sizes] }));
+    if (Array.isArray(data)) return { categories: fresh(), products: data };   // older file: products only
+    return {
+      categories: Array.isArray(data.categories) && data.categories.length ? data.categories : fresh(),
+      products: Array.isArray(data.products) ? data.products : []
+    };
   }
 
-  function serialize(list) {
+  function serialize(data) {
     return `/* =====================================================================
-   PRODUCTS — managed from the admin page (admin.html).
-   You can still edit this file by hand: keep everything between the
-   DATA and END markers valid JSON (double quotes, no trailing commas).
-   Products marked "sample": true are the example items the site
-   started with; remove them from the admin page.
+   SHOP CATALOGUE — categories and products, managed from the admin page
+   (admin.html). You can still edit this file by hand: keep everything
+   between the DATA and END markers valid JSON (double quotes, no
+   trailing commas). Products marked "sample": true are the example
+   items the site started with.
    ===================================================================== */
-window.PRODUCTS = /*DATA*/${JSON.stringify(list, null, 2)}/*END*/;
+window.SHOP_DATA = /*DATA*/${JSON.stringify({ categories: data.categories, products: data.products }, null, 2)}/*END*/;
+window.CATEGORIES = window.SHOP_DATA.categories;
+window.PRODUCTS = window.SHOP_DATA.products;
 `;
   }
 
@@ -144,12 +163,12 @@ window.PRODUCTS = /*DATA*/${JSON.stringify(list, null, 2)}/*END*/;
     const ref = await gh(`/git/ref/heads/${st.branch}`);
     const head = ref.object.sha;
     const file = await gh(`/contents/${PRODUCTS_PATH}?ref=${head}`);
-    return { head, products: parseProducts(fromB64(file.content)) };
+    return { head, data: parseCatalog(fromB64(file.content)) };
   }
 
-  /* Apply `mutate` to the latest product list and save it (plus any new
-     photos, minus photos no longer used) as one commit. Re-reads the list
-     first, so changes made on another phone are not lost. */
+  /* Apply `mutate` to the latest catalogue ({ categories, products }) and save
+     it (plus any new photos, minus photos no longer used) as one commit.
+     Re-reads the catalogue first, so changes made on another phone are not lost. */
   async function commit(message, mutate, newImages = []) {
     const blobs = [];
     for (const img of newImages) {
@@ -157,10 +176,10 @@ window.PRODUCTS = /*DATA*/${JSON.stringify(list, null, 2)}/*END*/;
       blobs.push({ path: img.path, sha: b.sha });
     }
     for (let attempt = 0; ; attempt++) {
-      const { head, products } = await loadRemote();
-      const after = mutate(JSON.parse(JSON.stringify(products)));
-      const used = new Set(after.flatMap(p => p.images || []));
-      const gone = [...new Set(products.flatMap(p => p.images || []))].filter(x => x.startsWith(IMG_DIR) && !used.has(x));
+      const { head, data } = await loadRemote();
+      const after = mutate(JSON.parse(JSON.stringify(data)));
+      const used = new Set(after.products.flatMap(p => p.images || []));
+      const gone = [...new Set(data.products.flatMap(p => p.images || []))].filter(x => x.startsWith(IMG_DIR) && !used.has(x));
       const base = await gh(`/git/commits/${head}`);
       let remove = [];
       if (gone.length) {
@@ -182,8 +201,10 @@ window.PRODUCTS = /*DATA*/${JSON.stringify(list, null, 2)}/*END*/;
         throw e;
       }
       st.head = nc.sha;
-      st.products = after;
+      st.categories = after.categories;
+      st.products = after.products;
       renderList();
+      if ($('#catsDialog').open) renderCats();
       return after;
     }
   }
@@ -248,7 +269,8 @@ window.PRODUCTS = /*DATA*/${JSON.stringify(list, null, 2)}/*END*/;
       st.branch = info.default_branch || 'main';
       const r = await loadRemote();
       st.head = r.head;
-      st.products = r.products;
+      st.categories = r.data.categories;
+      st.products = r.data.products;
       view('listView');
       renderList();
       return null;
@@ -385,8 +407,9 @@ window.PRODUCTS = /*DATA*/${JSON.stringify(list, null, 2)}/*END*/;
     $('#sampleBanner').hidden = !samples;
     $('#sampleCount').textContent = `${samples} sample product${samples === 1 ? '' : 's'} still showing.`;
 
-    const tabs = [['all', 'All', all.length]].concat(Object.entries(CATS).map(([k, l]) => [k, l === 'Saree' ? 'Sarees' : l === 'Combo' ? 'Combos' : l, all.filter(p => p.category === k).length]));
-    $('#adminTabs').innerHTML = tabs.map(([k, l, n]) => `<button type="button" class="tab ${st.cat === k ? 'on' : ''}" data-tab="${k}" aria-pressed="${st.cat === k}">${l}<span class="tab-n">${n}</span></button>`).join('');
+    if (st.cat !== 'all' && !catOf(st.cat)) st.cat = 'all';
+    const tabs = [['all', 'All', all.length]].concat(st.categories.map(c => [c.id, c.name, countIn(c.id)]));
+    $('#adminTabs').innerHTML = tabs.map(([k, l, n]) => `<button type="button" class="tab ${st.cat === k ? 'on' : ''}" data-tab="${esc(k)}" aria-pressed="${st.cat === k}">${esc(l)}<span class="tab-n">${n}</span></button>`).join('');
 
     const q = st.q.trim().toLowerCase();
     const list = all.filter(p => (st.cat === 'all' || p.category === st.cat) && (!q || `${p.name} ${p.type}`.toLowerCase().includes(q)));
@@ -401,7 +424,7 @@ window.PRODUCTS = /*DATA*/${JSON.stringify(list, null, 2)}/*END*/;
         <button type="button" class="prow-pic" data-edit="${esc(p.id)}" aria-label="Edit ${esc(p.name)}">${thumb(p)}</button>
         <div class="prow-info">
           <p class="prow-name">${esc(p.name)}</p>
-          <p class="prow-meta">${CATS[p.category] || p.category}${p.type ? ' · ' + esc(p.type) : ''}${p.images && p.images.length ? ` · ${p.images.length} photo${p.images.length > 1 ? 's' : ''}` : ''}</p>
+          <p class="prow-meta">${esc(catLabel(p.category))}${p.type ? ' · ' + esc(p.type) : ''}${p.images && p.images.length ? ` · ${p.images.length} photo${p.images.length > 1 ? 's' : ''}` : ''}</p>
           <p class="prow-price">${money(p.price)}${p.mrp > p.price ? `<s>${money(p.mrp)}</s>` : ''}</p>
           ${p.sample || sold ? `<div class="prow-tags">${p.sample ? '<span class="ptag sample">Sample</span>' : ''}${sold ? '<span class="ptag out">Sold out</span>' : ''}</div>` : ''}
         </div>
@@ -429,8 +452,9 @@ window.PRODUCTS = /*DATA*/${JSON.stringify(list, null, 2)}/*END*/;
     editing = p || null;
     const f = $('#editForm');
     f.reset();
-    const cat = p ? p.category : (st.cat !== 'all' ? st.cat : 'sarees');
-    $$('input[name="category"]', f).forEach(r => { r.checked = r.value === cat; });
+    const first = (st.categories[0] || {}).id;
+    const cat = p && catOf(p.category) ? p.category : (!p && catOf(st.cat) ? st.cat : first);
+    $('#edCat').innerHTML = st.categories.map(c => `<label><input type="radio" name="category" value="${esc(c.id)}" ${c.id === cat ? 'checked' : ''}><span>${esc(c.name)}</span></label>`).join('');
     f.elements.name.value = p ? p.name : '';
     f.elements.type.value = p ? (p.type || '') : '';
     f.elements.price.value = p ? p.price : '';
@@ -440,7 +464,7 @@ window.PRODUCTS = /*DATA*/${JSON.stringify(list, null, 2)}/*END*/;
     f.elements.badge.value = p ? (p.badge || '') : '';
     f.elements.inStock.checked = !p || p.inStock !== false;
     f.elements.isNew.checked = p ? !!p.isNew : true;
-    $('#edSizes').innerHTML = checkList('sizes', SIZES.map(s => [s, s]), p && p.sizes ? p.sizes : SIZES);
+    renderSizes(p && p.category === cat && p.sizes ? p.sizes : null);
     $('#edColors').innerHTML = checkList('colors', Object.entries(COLORS).map(([k, v]) => [k, v[0]]), p ? p.colors || [] : [], true);
     $('#edOcc').innerHTML = checkList('occasions', OCCASIONS.map(o => [o, o]), p ? p.occasions || [] : []);
     $('#typeList').innerHTML = [...new Set(st.products.map(x => x.type).filter(Boolean))].map(t => `<option value="${esc(t)}">`).join('');
@@ -449,7 +473,6 @@ window.PRODUCTS = /*DATA*/${JSON.stringify(list, null, 2)}/*END*/;
     $('#edDelete').hidden = !p;
     $('#edError').hidden = true;
     $('#edSave').textContent = p ? 'Save changes' : 'Save product';
-    syncCategory();
     renderPhotos();
     showOff();
     const d = $('#editor');
@@ -457,8 +480,13 @@ window.PRODUCTS = /*DATA*/${JSON.stringify(list, null, 2)}/*END*/;
     d.scrollTop = 0;
   }
 
-  function currentCategory() { return ($('input[name="category"]:checked') || {}).value || 'sarees'; }
-  function syncCategory() { $('#sizeBlock').hidden = currentCategory() === 'sarees'; }
+  function currentCategory() { return ($('input[name="category"]:checked') || {}).value || (st.categories[0] || {}).id; }
+  // size checkboxes come from the chosen category; `selected` null = all ticked
+  function renderSizes(selected) {
+    const sizes = (catOf(currentCategory()) || {}).sizes || [];
+    $('#sizeBlock').hidden = !sizes.length;
+    $('#edSizes').innerHTML = checkList('sizes', sizes.map(s => [s, s]), selected || sizes);
+  }
 
   function showOff() {
     const f = $('#editForm');
@@ -512,13 +540,19 @@ window.PRODUCTS = /*DATA*/${JSON.stringify(list, null, 2)}/*END*/;
     }
   }
 
-  function autoArt(p) {
+  // picture settings for a product with no photo, in its main colour, drawn the category's way
+  function autoArt(p, cat) {
     const main = p.colors.find(c => c !== 'gold') || p.colors[0];
     const c = ART_HEX[main] || '#7a1230';
     const second = p.colors.find(x => x !== main && x !== 'gold');
     const saree = { body: c, border: second ? ART_HEX[second] : undefined, zari: '#dcb15a', motif: 'buttas', borderStyle: second ? 'temple' : 'zari', sheen: 0.24 };
     const bangles = { style: 'glass', colors: [c, '#d4a64a'], glitter: '#f6d58c' };
-    return p.category === 'bangles' ? bangles : p.category === 'combos' ? { saree, bangles } : saree;
+    switch ((cat || {}).art) {
+      case 'saree': return saree;
+      case 'bangles': return bangles;
+      case 'combo': return { saree, bangles };
+      default: return { kind: 'plain', color: c, label: cat ? cat.name : '' };
+    }
   }
 
   function editorError(msg, field) {
@@ -543,11 +577,14 @@ window.PRODUCTS = /*DATA*/${JSON.stringify(list, null, 2)}/*END*/;
 
     const category = currentCategory();
     const picked = n => $$(`input[name="${n}"]:checked`, f).map(i => i.value);
+    const cat = catOf(category);
+    if (!cat) return editorError('Please choose a category.');
+    const catSizes = cat.sizes || [];
     const sizes = picked('sizes');
-    if (category !== 'sarees' && !sizes.length) return editorError('Please tick at least one bangle size.');
+    if (catSizes.length && !sizes.length) return editorError('Please tick at least one size.');
     const colors = picked('colors');
 
-    const id = editing ? editing.id : `${category[0]}-${Date.now().toString(36)}`;
+    const id = editing ? editing.id : `${(category.replace(/[^a-z0-9]/gi, '')[0] || 'p').toLowerCase()}-${Date.now().toString(36)}`;
     const stamp = Date.now().toString(36);
     const newImages = [];
     const images = photos.map((ph, i) => {
@@ -571,17 +608,17 @@ window.PRODUCTS = /*DATA*/${JSON.stringify(list, null, 2)}/*END*/;
     if (badge) p.badge = badge;
     if (f.elements.isNew.checked) p.isNew = true;
     if (!f.elements.inStock.checked) p.inStock = false;
-    if (category !== 'sarees') p.sizes = SIZES.filter(s => sizes.includes(s));
+    if (catSizes.length) p.sizes = catSizes.filter(s => sizes.includes(s));
     const sameLook = editing && editing.art && editing.category === category && JSON.stringify(editing.colors || []) === JSON.stringify(colors);
-    p.art = sameLook ? editing.art : autoArt(p);
+    p.art = sameLook ? editing.art : autoArt(p, cat);
 
     const isNew = !editing;
     try {
       await withBusy(newImages.length ? `Uploading ${newImages.length} photo${newImages.length > 1 ? 's' : ''}…` : 'Saving…', () =>
-        commit(`Admin: ${isNew ? 'add' : 'update'} "${name}"`, list => {
-          const i = list.findIndex(x => x.id === id);
-          if (i >= 0) list[i] = p; else list.unshift(p);
-          return list;
+        commit(`Admin: ${isNew ? 'add' : 'update'} "${name}"`, data => {
+          const i = data.products.findIndex(x => x.id === id);
+          if (i >= 0) data.products[i] = p; else data.products.unshift(p);
+          return data;
         }, newImages));
       $('#editor').close();
       toast(isNew ? 'Product added! It shows on your website in 1–2 minutes.' : 'Saved! Your website updates in 1–2 minutes.');
@@ -593,7 +630,7 @@ window.PRODUCTS = /*DATA*/${JSON.stringify(list, null, 2)}/*END*/;
     if (!confirm(`Delete "${editing.name}" from your website? Its photos are deleted too.`)) return;
     const id = editing.id, name = editing.name;
     try {
-      await withBusy('Deleting…', () => commit(`Admin: delete "${name}"`, list => list.filter(x => x.id !== id)));
+      await withBusy('Deleting…', () => commit(`Admin: delete "${name}"`, data => ({ ...data, products: data.products.filter(x => x.id !== id) })));
       $('#editor').close();
       toast('Deleted. Your website updates in 1–2 minutes.');
     } catch (e) { onError(e); }
@@ -605,11 +642,14 @@ window.PRODUCTS = /*DATA*/${JSON.stringify(list, null, 2)}/*END*/;
     if (!p) return;
     try {
       await withBusy(inStock ? 'Marking in stock…' : 'Marking sold out…', () =>
-        commit(`Admin: ${inStock ? 'back in stock' : 'sold out'} "${p.name}"`, list => list.map(x => {
-          if (x.id !== id) return x;
-          const y = { ...x };
-          if (inStock) delete y.inStock; else y.inStock = false;
-          return y;
+        commit(`Admin: ${inStock ? 'back in stock' : 'sold out'} "${p.name}"`, data => ({
+          ...data,
+          products: data.products.map(x => {
+            if (x.id !== id) return x;
+            const y = { ...x };
+            if (inStock) delete y.inStock; else y.inStock = false;
+            return y;
+          })
         })));
       toast(inStock ? 'Back in stock.' : 'Marked as sold out.');
     } catch (e) { input.checked = !inStock; onError(e); }
@@ -619,11 +659,11 @@ window.PRODUCTS = /*DATA*/${JSON.stringify(list, null, 2)}/*END*/;
     const p = st.products.find(x => x.id === id);
     if (!p) return;
     try {
-      await withBusy('Moving…', () => commit(`Admin: reorder "${p.name}"`, list => {
+      await withBusy('Moving…', () => commit(`Admin: reorder "${p.name}"`, data => {
+        const list = data.products;
         const i = list.findIndex(x => x.id === id), j = i + dir;
-        if (i < 0 || j < 0 || j >= list.length) return list;
-        [list[i], list[j]] = [list[j], list[i]];
-        return list;
+        if (i >= 0 && j >= 0 && j < list.length) [list[i], list[j]] = [list[j], list[i]];
+        return data;
       }));
     } catch (e) { onError(e); }
   }
@@ -632,8 +672,166 @@ window.PRODUCTS = /*DATA*/${JSON.stringify(list, null, 2)}/*END*/;
     const n = st.products.filter(p => p.sample).length;
     if (!n || !confirm(`Remove all ${n} sample products from your website? Your own products stay.`)) return;
     try {
-      await withBusy('Removing samples…', () => commit('Admin: remove sample products', list => list.filter(p => !p.sample)));
+      await withBusy('Removing samples…', () => commit('Admin: remove sample products', data => ({ ...data, products: data.products.filter(p => !p.sample) })));
       toast('Samples removed. Your website updates in 1–2 minutes.');
+    } catch (e) { onError(e); }
+  }
+
+  // ---- categories --------------------------------------------------------------------
+  let editingCat = null;   // category being edited (null = new)
+
+  function renderCats() {
+    const cats = st.categories;
+    $('#catList').innerHTML = cats.map((c, i) => {
+      const n = countIn(c.id);
+      return `<div class="cat-row">
+        <div>
+          <strong>${esc(c.name)}</strong>
+          <small>${n} product${n === 1 ? '' : 's'}${n ? '' : ' · hidden from customers'} · ${(c.sizes || []).length ? 'Sizes: ' + esc(c.sizes.join(', ')) : 'No sizes'}</small>
+          ${c.description ? `<small>${esc(c.description)}</small>` : ''}
+        </div>
+        <div class="order">
+          <button type="button" class="icon-btn sm" data-cat-move="-1" data-id="${esc(c.id)}" aria-label="Move ${esc(c.name)} up" ${i === 0 ? 'disabled' : ''}>${ICON.up}</button>
+          <button type="button" class="icon-btn sm" data-cat-move="1" data-id="${esc(c.id)}" aria-label="Move ${esc(c.name)} down" ${i === cats.length - 1 ? 'disabled' : ''}>${ICON.down}</button>
+          <button type="button" class="btn btn-sm btn-soft" data-cat-edit="${esc(c.id)}">Edit</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function openCats() {
+    renderCats();
+    const d = $('#catsDialog');
+    if (!d.open) d.showModal();
+  }
+
+  const parseSizes = s => [...new Set(String(s).split(',').map(x => x.trim()).filter(Boolean))].slice(0, 20);
+
+  function openCatEditor(c) {
+    editingCat = c || null;
+    const f = $('#catForm');
+    f.reset();
+    f.elements.name.value = c ? c.name : '';
+    f.elements.description.value = c ? (c.description || '') : '';
+    f.elements.sizes.value = c ? (c.sizes || []).join(', ') : '';
+    const art = c ? (c.art || 'plain') : 'plain';
+    $$('input[name="art"]', f).forEach(r => { r.checked = r.value === art; });
+    $('#ceTitle').textContent = c ? `Edit "${c.name}"` : 'Add category';
+    $('#ceSave').textContent = c ? 'Save changes' : 'Add category';
+    $('#ceError').hidden = true;
+    const box = $('#ceDeleteBox');
+    box.hidden = !c;
+    if (c) {
+      const n = countIn(c.id);
+      const others = st.categories.filter(x => x.id !== c.id);
+      $('#ceDeleteText').textContent = !others.length
+        ? 'This is your only category, so it cannot be deleted. Add another category first.'
+        : n ? `This category has ${n} product${n === 1 ? '' : 's'}. Choose where to move ${n === 1 ? 'it' : 'them'} before deleting.` : 'This category has no products.';
+      $('#ceMoveField').hidden = !n || !others.length;
+      $('#ceMoveTo').innerHTML = others.map(x => `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('');
+      $('#ceDelete').hidden = !others.length;
+    }
+    const d = $('#catEditor');
+    if (!d.open) d.showModal();
+    d.scrollTop = 0;
+    setTimeout(() => f.elements.name.focus(), 50);
+  }
+
+  function slugify(name, taken) {
+    let base = name.toLowerCase().normalize('NFKD').replace(/[^\w\s-]/g, '').trim().replace(/[\s_-]+/g, '-').replace(/^-|-$/g, '');
+    if (!base) base = 'cat-' + Date.now().toString(36);
+    let id = base, n = 2;
+    while (taken.has(id)) id = `${base}-${n++}`;
+    return id;
+  }
+
+  // keep a product's sizes in line with the category it now belongs to
+  function fitSizes(p, cat) {
+    const sizes = (cat && cat.sizes) || [];
+    const y = { ...p };
+    if (!sizes.length) delete y.sizes;
+    else {
+      const keep = (p.sizes || []).filter(s => sizes.includes(s));
+      y.sizes = keep.length ? keep : [...sizes];
+    }
+    return y;
+  }
+
+  async function saveCat(ev) {
+    ev.preventDefault();
+    const f = ev.target;
+    const err = msg => { const e = $('#ceError'); e.textContent = msg; e.hidden = false; };
+    const name = f.elements.name.value.trim();
+    if (!name) return err('Please type a category name.');
+    if (st.categories.some(c => c.name.toLowerCase() === name.toLowerCase() && (!editingCat || c.id !== editingCat.id))) return err('There is already a category with this name.');
+    const fields = {
+      name,
+      description: f.elements.description.value.trim(),
+      art: ($('input[name="art"]:checked', f) || {}).value || 'plain',
+      sizes: parseSizes(f.elements.sizes.value)
+    };
+    const old = editingCat;
+    let applySizes = false;
+    if (old && countIn(old.id) && JSON.stringify(old.sizes || []) !== JSON.stringify(fields.sizes)) {
+      const n = countIn(old.id);
+      const them = n === 1 ? `the 1 product` : `all ${n} products`;
+      applySizes = confirm(fields.sizes.length
+        ? `Use the sizes ${fields.sizes.join(', ')} for ${them} in "${name}"?\n\nOK = update ${n === 1 ? 'it' : 'them all'}. Cancel = only new products get these sizes.`
+        : `Remove sizes from ${them} in "${name}"?\n\nOK = remove. Cancel = keep the current sizes.`);
+    }
+    try {
+      await withBusy('Saving category…', () => commit(`Admin: ${old ? 'update' : 'add'} category "${name}"`, data => {
+        if (old) {
+          const i = data.categories.findIndex(c => c.id === old.id);
+          if (i < 0) data.categories.push({ id: old.id, ...fields });
+          else data.categories[i] = { ...data.categories[i], ...fields };
+          if (applySizes) {
+            data.products = data.products.map(p => {
+              if (p.category !== old.id) return p;
+              const y = { ...p };
+              if (fields.sizes.length) y.sizes = [...fields.sizes]; else delete y.sizes;
+              return y;
+            });
+          }
+        } else {
+          data.categories.push({ id: slugify(name, new Set(data.categories.map(c => c.id))), ...fields });
+        }
+        return data;
+      }));
+      $('#catEditor').close();
+      toast(old ? 'Category saved.' : `"${name}" added. Add products to it and it appears on your website.`);
+    } catch (e) { onError(e); }
+  }
+
+  async function deleteCat() {
+    const c = editingCat;
+    if (!c) return;
+    const n = countIn(c.id);
+    const target = catOf($('#ceMoveTo').value);
+    if (n && !target) return;
+    if (!confirm(n ? `Delete "${c.name}" and move its ${n} product${n === 1 ? '' : 's'} to "${target.name}"?` : `Delete the category "${c.name}"?`)) return;
+    try {
+      await withBusy('Deleting category…', () => commit(`Admin: delete category "${c.name}"${n ? ` (moved ${n} to "${target.name}")` : ''}`, data => {
+        const dest = target && data.categories.find(x => x.id === target.id);
+        data.categories = data.categories.filter(x => x.id !== c.id);
+        if (dest) data.products = data.products.map(p => (p.category === c.id ? fitSizes({ ...p, category: dest.id }, dest) : p));
+        return data;
+      }));
+      $('#catEditor').close();
+      toast(n ? `Deleted. ${n} product${n === 1 ? '' : 's'} moved to "${target.name}".` : 'Category deleted.');
+    } catch (e) { onError(e); }
+  }
+
+  async function moveCat(id, dir) {
+    const c = catOf(id);
+    if (!c) return;
+    try {
+      await withBusy('Moving…', () => commit(`Admin: reorder category "${c.name}"`, data => {
+        const list = data.categories;
+        const i = list.findIndex(x => x.id === id), j = i + dir;
+        if (i >= 0 && j >= 0 && j < list.length) [list[i], list[j]] = [list[j], list[i]];
+        return data;
+      }));
     } catch (e) { onError(e); }
   }
 
@@ -657,6 +855,10 @@ window.PRODUCTS = /*DATA*/${JSON.stringify(list, null, 2)}/*END*/;
       if (st.token && hiddenAt && Date.now() - hiddenAt > LOCK_AFTER_MS && !$('#busy').classList.contains('show')) lock();
     });
     $('#addBtn').addEventListener('click', () => openEditor(null));
+    $('#catsBtn').addEventListener('click', openCats);
+    $('#addCatBtn').addEventListener('click', () => openCatEditor(null));
+    $('#catForm').addEventListener('submit', saveCat);
+    $('#ceDelete').addEventListener('click', deleteCat);
     $('#removeSamples').addEventListener('click', removeSamples);
     $('#adminSearch').addEventListener('input', e => { st.q = e.target.value; renderList(); });
     $('#editForm').addEventListener('submit', saveProduct);
@@ -665,7 +867,7 @@ window.PRODUCTS = /*DATA*/${JSON.stringify(list, null, 2)}/*END*/;
 
     document.addEventListener('change', e => {
       if (e.target.id === 'edFile') { const files = e.target.files; if (files && files.length) addFiles(files); return; }
-      if (e.target.name === 'category') { syncCategory(); return; }
+      if (e.target.name === 'category' && e.target.closest('#edCat')) { renderSizes(null); return; }
       if (e.target.dataset.stock) setStock(e.target.dataset.stock, e.target.checked, e.target);
     });
 
@@ -679,17 +881,25 @@ window.PRODUCTS = /*DATA*/${JSON.stringify(list, null, 2)}/*END*/;
       if (ds.move) { move(ds.id, Number(ds.move)); return; }
       if (ds.phRemove) { photos.splice(Number(ds.phRemove), 1); renderPhotos(); return; }
       if (ds.phMain) { const [ph] = photos.splice(Number(ds.phMain), 1); photos.unshift(ph); renderPhotos(); return; }
+      if (ds.catEdit) { openCatEditor(catOf(ds.catEdit)); return; }
+      if (ds.catMove) { moveCat(ds.id, Number(ds.catMove)); return; }
+      if ('preset' in ds) { $('#ceSizes').value = ds.preset; return; }
     });
 
-    const ed = $('#editor');
-    ed.addEventListener('click', e => {
-      if (e.target !== ed) return;
-      const r = ed.getBoundingClientRect();
-      if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) ed.close();
-    });
-    ed.addEventListener('close', () => {
-      const t = $('#toast');
-      if (ed.contains(t)) document.body.appendChild(t);
+    $$('dialog').forEach(d => {
+      // tap outside the panel closes it
+      d.addEventListener('click', e => {
+        if (e.target !== d) return;
+        const r = d.getBoundingClientRect();
+        if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) d.close();
+      });
+      // a toast shown inside this popup moves back out when it closes
+      d.addEventListener('close', () => {
+        const t = $('#toast');
+        if (!d.contains(t)) return;
+        ($$('dialog[open]').pop() || document.body).appendChild(t);
+        if (t.classList.contains('show')) { try { t.showPopover(); } catch { /* no popover */ } }
+      });
     });
   }
 

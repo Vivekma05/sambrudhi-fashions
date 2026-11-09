@@ -78,14 +78,23 @@
     '3to7k': ['₹3,000 – ₹7,000', 3001, 7000],
     o7k: ['Above ₹7,000', 7001, Infinity]
   };
-  const CATS = [
-    ['sarees', 'Sarees', 'Silk, cotton, georgette & more', 's2'],
-    ['bangles', 'Bangles', 'Glass, kundan, thread & lac', 'b2'],
-    ['combos', 'Combos', 'Saree + matching bangles', 'c1']
+  // categories come from the catalogue (managed on the admin page)
+  const CATS = (window.CATEGORIES && window.CATEGORIES.length) ? window.CATEGORIES : [
+    { id: 'sarees', name: 'Sarees', description: '', art: 'saree', sizes: [] },
+    { id: 'bangles', name: 'Bangles', description: '', art: 'bangles', sizes: [] },
+    { id: 'combos', name: 'Combos', description: '', art: 'combo', sizes: [] }
   ];
+  const catById = new Map(CATS.map(c => [c.id, c]));
+  const catName = id => (catById.get(id) || {}).name || id;
+  const catKind = id => (catById.get(id) || {}).art || 'plain';
+  const isBangleKind = id => ['bangles', 'combo'].includes(catKind(id));
   const SIZE_GUIDE = [['2.2', '54 mm'], ['2.4', '57 mm'], ['2.6', '60 mm'], ['2.8', '64 mm'], ['2.10', '67 mm']];
   const usedColors = Object.keys(COLORS).filter(c => PRODUCTS.some(p => p.colors.includes(c)));
   const countIn = (key, val) => PRODUCTS.filter(p => (key === 'cat' ? p.category === val : p.occasions.includes(val))).length;
+  const liveCats = CATS.filter(c => countIn('cat', c.id) > 0);   // categories that have products
+  const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  const listNames = names => names.length < 2 ? (names[0] || '') : `${names.slice(0, -1).join(', ')} & ${names[names.length - 1]}`;
+  const coverOf = id => { const inCat = PRODUCTS.filter(p => p.category === id); return inCat.find(p => p.images && p.images.length) || inCat[0]; };
 
   // ---- state --------------------------------------------------------------
   let bag = load('bag', []).filter(i => byId.has(i.id) && i.qty > 0 && byId.get(i.id).inStock !== false);
@@ -132,7 +141,7 @@
     $('#heroPoints').innerHTML = [
       S.cashOnDelivery && 'Cash on delivery',
       `Free delivery above ${money(S.freeDeliveryAbove)}`,
-      'Bangle size guide'
+      liveCats.some(c => isBangleKind(c.id)) ? 'Bangle size guide' : 'Order on WhatsApp'
     ].filter(Boolean).map(t => `<li>${ICON.check}${esc(t)}</li>`).join('');
 
     // trust strip
@@ -144,31 +153,49 @@
     ];
     $('#trust').innerHTML = trust.map(([i, t, s]) => `<li><span class="trust-ico">${i}</span><span><strong>${esc(t)}</strong><small>${esc(s)}</small></span></li>`).join('');
 
-    // categories
-    $('#catGrid').innerHTML = CATS.map(([key, title, sub, sample]) => {
-      const p = byId.get(sample) || PRODUCTS.find(x => x.category === key);
-      if (!p) return '';
-      return `<a class="cat-card" href="#shop" data-go="${key}">
+    // categories: cards, menus, footer, buttons
+    $('#catGrid').innerHTML = liveCats.map(c => {
+      const p = coverOf(c.id);
+      return `<a class="cat-card" href="#shop" data-go="${esc(c.id)}">
         <div class="cat-art">${picture(p)}</div>
-        <div class="cat-text"><h3>${title}</h3><p>${sub}</p><span class="cat-link">${countIn('cat', key)} styles ${ICON.arrow}</span></div>
+        <div class="cat-text"><h3>${esc(c.name)}</h3>${c.description ? `<p>${esc(c.description)}</p>` : ''}<span class="cat-link">${plural(countIn('cat', c.id), 'style')} ${ICON.arrow}</span></div>
       </a>`;
     }).join('');
+    $('#catGrid').classList.toggle('many', liveCats.length > 3);
+    const catLink = (c, tag = '') => `<a href="#shop" data-go="${esc(c.id)}"${tag}>${esc(c.name)}</a>`;
+    $('#navCats').innerHTML = liveCats.slice(0, 4).map(c => catLink(c)).join('') + (liveCats.length > 4 ? '<a href="#shop" data-go="all">More</a>' : '');
+    $('#footShop').innerHTML = liveCats.map(c => `<li>${catLink(c)}</li>`).join('') + '<li><a href="#shop" data-go="wishlist">Wishlist</a></li>';
+    $('#menuCats').outerHTML = liveCats.map(c => `<li>${catLink(c)}</li>`).join('') || '<li><a href="#shop" data-go="all">All products</a></li>';
+    [$('#heroCta1'), $('#heroCta2')].forEach((a, i) => {
+      const c = liveCats[i];
+      if (!c) return;
+      a.dataset.go = c.id;
+      a.textContent = `Shop ${c.name.toLowerCase()}`;
+      a.hidden = false;
+    });
+    if (liveCats.length) $('#shopHeading').textContent = listNames(liveCats.slice(0, 3).map(c => c.name));
 
     // occasions
     $('#occGrid').innerHTML = OCCASIONS.map(([o, sub, c1, c2]) => `
       <a class="occ" href="#shop" data-go-occasion="${o}" style="--c1:${c1};--c2:${c2}">
         <span class="occ-art">${Art.mandala('#f3d38a')}</span>
-        <h3>${o}</h3><p>${sub}</p><span class="occ-count">${countIn('occ', o)} pieces</span>
+        <h3>${o}</h3><p>${sub}</p><span class="occ-count">${plural(countIn('occ', o), 'piece')}</span>
       </a>`).join('');
 
     // complete-the-look art
-    const matchPick = byId.get('c2') || PRODUCTS.find(p => p.category === 'combos');
-    if (matchPick) $('#matchArt').innerHTML = picture(matchPick);
-    else $('#matchSection').hidden = true;
+    const comboCat = liveCats.find(c => c.art === 'combo');
+    const matchPick = comboCat && (PRODUCTS.find(p => p.category === comboCat.id && p.images && p.images.length) || byId.get('c2') || coverOf(comboCat.id));
+    if (comboCat && matchPick) {
+      $('#matchArt').innerHTML = picture(matchPick);
+      $('#matchCta').dataset.go = comboCat.id;
+      $('#matchCta').textContent = `Shop ${comboCat.name.toLowerCase()}`;
+    } else {
+      $('#matchSection').hidden = true;
+    }
 
     // how to order
     const steps = [
-      ['Pick your favourites', 'Browse sarees, bangles and combos. Choose your bangle size.'],
+      ['Pick your favourites', `Browse ${listNames(liveCats.slice(0, 3).map(c => c.name.toLowerCase())) || 'the collection'}. Choose your size where needed.`],
       ['Checkout in a minute', 'Add your delivery address — no account or sign-up needed.'],
       ['Confirm on WhatsApp', 'Your order opens in WhatsApp. Tap send and we reply to confirm.'],
       [S.cashOnDelivery ? 'Pay by UPI or COD' : 'Pay by UPI', S.cashOnDelivery ? 'Pay by UPI after we confirm, or in cash when it arrives.' : 'Pay by UPI after we confirm your order.']
@@ -246,7 +273,7 @@
   }
 
   function renderFilters() {
-    const tabs = [['all', 'All'], ['sarees', 'Sarees'], ['bangles', 'Bangles'], ['combos', 'Combos'], ['wishlist', 'Wishlist']];
+    const tabs = [['all', 'All'], ...liveCats.map(c => [c.id, esc(c.name)]), ['wishlist', 'Wishlist']];
     $('#catTabs').innerHTML = tabs.map(([k, l]) =>
       `<button type="button" class="tab ${state.cat === k ? 'on' : ''}" data-cat="${k}" aria-pressed="${state.cat === k}">${k === 'wishlist' ? ICON.heart : ''}${l}${k === 'wishlist' && wish.size ? `<span class="tab-n">${wish.size}</span>` : ''}</button>`).join('');
 
@@ -268,7 +295,7 @@
 
   function matchesQuery(p, q) {
     if (!q) return true;
-    const words = [p.name, p.type, p.category, p.description, ...p.occasions, ...p.colors.map(c => (COLORS[c] || [c])[0])]
+    const words = [p.name, p.type, p.category, catName(p.category), p.description, ...p.occasions, ...p.colors.map(c => (COLORS[c] || [c])[0])]
       .join(' ').toLowerCase().split(/[^a-z0-9.]+/).filter(Boolean);
     return q.split(/\s+/).filter(Boolean).every(t => words.some(w => w.startsWith(t) || (t.length > 3 && w.startsWith(t.replace(/s$/, '')))));
   }
@@ -441,14 +468,16 @@
   let current = null, currentSize = null, currentQty = 1;
 
   function matchesFor(p) {
-    const want = p.category === 'sarees' ? ['bangles', 'combos'] : p.category === 'bangles' ? ['sarees', 'combos'] : ['bangles', 'sarees'];
+    // suggest items from other categories in matching colours; sarees ↔ bangles first
+    const kind = catKind(p.category);
+    const pref = kind === 'saree' ? 'bangles' : kind === 'bangles' ? 'saree' : kind === 'combo' ? 'bangles' : '';
     const main = p.colors.filter(c => c !== 'gold');
     return PRODUCTS
-      .filter(q => q.id !== p.id && want.includes(q.category) && q.inStock !== false)
+      .filter(q => q.id !== p.id && q.category !== p.category && q.inStock !== false)
       .map(q => {
         const shared = q.colors.filter(c => main.includes(c)).length;
         const occ = q.occasions.filter(o => p.occasions.includes(o)).length;
-        return [q, shared * 4 + occ + (q.category === want[0] ? 1 : 0) + (shared ? 0 : -5)];
+        return [q, shared * 4 + occ + (pref && catKind(q.category) === pref ? 2 : 0) + (shared ? 0 : -5)];
       })
       .filter(([, s]) => s > 0)
       .sort((a, b) => b[1] - a[1])
@@ -467,9 +496,9 @@
 
     const sizes = p.sizes ? `
       <div class="pm-block">
-        <div class="pm-label"><span>Bangle size</span><button type="button" class="link-btn" data-toggle-guide aria-expanded="false">Size guide</button></div>
-        <div class="sizes" role="group" aria-label="Bangle size">${p.sizes.map(s => `<button type="button" class="size" data-size="${esc(s)}" aria-pressed="false">${esc(s)}</button>`).join('')}</div>
-        <p class="size-hint" id="sizeHint" hidden>Please choose your bangle size</p>
+        <div class="pm-label"><span>${isBangleKind(p.category) ? 'Bangle size' : 'Size'}</span>${isBangleKind(p.category) ? '<button type="button" class="link-btn" data-toggle-guide aria-expanded="false">Size guide</button>' : ''}</div>
+        <div class="sizes" role="group" aria-label="Size">${p.sizes.map(s => `<button type="button" class="size" data-size="${esc(s)}" aria-pressed="false">${esc(s)}</button>`).join('')}</div>
+        <p class="size-hint" id="sizeHint" hidden>Please choose a size</p>
         <div class="guide" id="sizeGuide" hidden>
           <p>Measure straight across the <strong>inside</strong> of a bangle that fits you well.</p>
           <table><thead><tr><th>Size</th>${SIZE_GUIDE.map(r => `<th>${r[0]}</th>`).join('')}</tr></thead>
@@ -483,7 +512,8 @@
       : '';
 
     const matches = matchesFor(p);
-    const matchTitle = p.category === 'sarees' ? 'Bangles to match' : p.category === 'bangles' ? 'Sarees to pair with' : 'Complete the look';
+    const kinds = new Set(matches.map(q => catKind(q.category)));
+    const matchTitle = kinds.size === 1 && kinds.has('bangles') ? 'Bangles to match' : kinds.size === 1 && kinds.has('saree') ? 'Sarees to pair with' : 'Complete the look';
 
     return `
       <div class="pm-grid">

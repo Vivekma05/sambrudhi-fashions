@@ -24,6 +24,7 @@ The online store of Samruddhi Fashion, a saree and bangle boutique at Hunasakatt
 
 ### Store management
 - **Admin page** (`admin.html`). Add, edit or delete products from a phone, including name, price, original price, photos, sizes, colours, occasions and stock status.
+- **Categories.** Create, rename, reorder and delete shop categories (for example Sarees, Bangles, Kurtis), each with its own size options. The menu, tabs and category cards follow automatically.
 - **Photos.** Photos are resized on the phone before upload, so pages stay fast.
 - **Publishing.** Every save goes live on the website within about two minutes.
 
@@ -35,7 +36,7 @@ The site is a static website hosted on **GitHub Pages**. There is no server and 
 
 | Data | Where it lives |
 |---|---|
-| Products and photos | In this repository (`js/products.js`, `images/products/`), managed through the admin page |
+| Categories, products and photos | In this repository (`js/products.js`, `images/products/`), managed through the admin page |
 | Shop settings | `js/shop-config.js` |
 | Orders | Sent to the shop as WhatsApp messages |
 | Payments | Made directly to the shop's UPI ID, or in cash on delivery |
@@ -53,7 +54,7 @@ admin.html            Product management page (not linked from the store)
 css/style.css         Storefront styles, design tokens at the top
 css/admin.css         Admin page styles
 js/shop-config.js     Shop settings: name, contact, UPI, delivery, policies, FAQ
-js/products.js        Product catalogue (JSON, maintained by the admin page)
+js/products.js        Catalogue: categories and products (JSON, maintained by the admin page)
 js/app.js             Storefront logic: catalogue, filters, bag, WhatsApp checkout
 js/admin.js           Admin logic: GitHub API, photo upload, product editor
 js/art.js             Illustrations shown for products that have no photo yet
@@ -86,8 +87,9 @@ images/products/      Product photos uploaded from the admin page
 - **Sold out:** turn the **In stock** switch off. The product stays visible, marked "Sold out".
 - **Order on the page:** use the arrows. Products at the top appear first in the store.
 - **Sample products:** the store launched with example items. Remove them in one tap with **Remove all samples**.
+- **Categories:** tap **Categories** to add a new one (name, short description, sizes such as S–XXL, and a placeholder picture style), edit or reorder categories, or delete one. Deleting moves its products to another category. Categories with no products stay hidden from customers.
 
-Products can also be edited by hand in `js/products.js`. Keep the content between the `/*DATA*/` and `/*END*/` markers as valid JSON.
+The catalogue can also be edited by hand in `js/products.js`. Keep the content between the `/*DATA*/` and `/*END*/` markers as valid JSON.
 
 ---
 
