@@ -10,6 +10,10 @@ window.SHOP = {
   // Short code used in order numbers, e.g. SF-261109-4821
   orderPrefix: 'SF',
 
+  // GitHub repository the admin page saves products to (owner/name).
+  // On the live site this is detected from the web address automatically.
+  githubRepo: 'Vivekma05/sambrudhi-fashions',
+
   // ---- IMPORTANT: orders are sent to this WhatsApp number -------------
   // Country code + number, digits only. India example: '919876543210'
   // (A plain 10-digit Indian number also works — 91 is added for you.)

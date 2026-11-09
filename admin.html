@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Shop admin</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#7a1530">
+  <link rel="icon" type="image/png" href="images/logo.png">
+  <link rel="apple-touch-icon" href="images/logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Jost:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body class="admin">
+
+  <header class="header">
+    <div class="wrap header-in">
+      <a class="logo" href="index.html" target="_blank" rel="noopener">
+        <img class="logo-mark" src="images/logo.png" alt="" width="40" height="40">
+        <span class="logo-text"><span class="logo-name" data-shop-name>Samruddhi Fashion</span><span class="logo-sub">Admin</span></span>
+      </a>
+      <div class="header-actions">
+        <a class="btn btn-outline btn-sm" href="index.html" target="_blank" rel="noopener">View shop</a>
+        <button type="button" class="icon-btn" id="logoutBtn" aria-label="Disconnect this phone" title="Disconnect this phone" hidden><span data-i="logout"></span></button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap admin-main">
+
+    <!-- ---------------- one-time connect ---------------- -->
+    <section id="connectView" class="connect" hidden>
+      <h1>Connect this phone</h1>
+      <p class="muted">The admin page saves your products into your GitHub repository, which is where the website lives. It needs a key from GitHub once on each phone or computer.</p>
+      <ol class="connect-steps">
+        <li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub → New access token</a> (sign in as <strong id="repoOwner"></strong>).</li>
+        <li><strong>Token name:</strong> Shop admin. <strong>Expiration:</strong> choose the longest option.</li>
+        <li><strong>Repository access:</strong> Only select repositories → <strong id="repoName"></strong>.</li>
+        <li><strong>Permissions:</strong> Repository permissions → <strong>Contents</strong> → <strong>Read and write</strong>.</li>
+        <li>Tap <strong>Generate token</strong>, copy it, and paste it below.</li>
+      </ol>
+      <form id="connectForm" class="connect-form">
+        <div class="field">
+          <label for="tokenInput">GitHub token</label>
+          <input id="tokenInput" name="token" required autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="github_pat_…">
+        </div>
+        <p class="form-error" id="connectError" hidden></p>
+        <button type="submit" class="btn btn-primary btn-block">Connect</button>
+        <p class="fine">The key is saved only on this device. Anyone who has it can change your shop, so don't share it.</p>
+      </form>
+    </section>
+
+    <!-- ---------------- loading ---------------- -->
+    <section id="loadingView" class="loading">
+      <div class="spinner" aria-hidden="true"></div>
+      <p id="loadingText">Loading…</p>
+    </section>
+
+    <!-- ---------------- product list ---------------- -->
+    <section id="listView" hidden>
+      <div class="admin-top">
+        <div>
+          <h1>Products</h1>
+          <p class="muted" id="countLine"></p>
+        </div>
+        <button type="button" class="btn btn-primary" id="addBtn"><span data-i="plus"></span> Add product</button>
+      </div>
+
+      <div class="sample-banner" id="sampleBanner" hidden>
+        <p><strong id="sampleCount"></strong> The site started with these sample items. Delete them once your own products are in.</p>
+        <button type="button" class="btn btn-outline btn-sm" id="removeSamples">Remove all samples</button>
+      </div>
+
+      <div class="admin-filters">
+        <div class="tabs" id="adminTabs"></div>
+        <label class="search">
+          <span data-i="search"></span>
+          <input id="adminSearch" type="search" placeholder="Search products" autocomplete="off" aria-label="Search products">
+        </label>
+      </div>
+
+      <div class="plist" id="plist"></div>
+      <p class="fine admin-foot">Changes show on the website about 1–2 minutes after saving. <span id="repoLine"></span></p>
+    </section>
+  </main>
+
+  <!-- ---------------- add / edit product ---------------- -->
+  <dialog class="modal editor" id="editor" aria-labelledby="edTitle">
+    <button type="button" class="modal-close" data-close aria-label="Close"><span data-i="close"></span></button>
+    <form id="editForm" class="ed-wrap" novalidate>
+      <h2 id="edTitle">Add product</h2>
+
+      <fieldset class="ed-block">
+        <legend>Category</legend>
+        <div class="seg" id="edCat">
+          <label><input type="radio" name="category" value="sarees" checked><span>Saree</span></label>
+          <label><input type="radio" name="category" value="bangles"><span>Bangles</span></label>
+          <label><input type="radio" name="category" value="combos"><span>Combo</span></label>
+        </div>
+      </fieldset>
+
+      <div class="ed-block">
+        <div class="ed-label">Photos <small>(first photo is the main one · up to 6)</small></div>
+        <div class="photos" id="edPhotos"></div>
+        <p class="fine left" id="photoNote">No photo? The shop shows a drawing in the colour you pick below.</p>
+      </div>
+
+      <div class="field">
+        <label for="edName">Product name</label>
+        <input id="edName" name="name" required maxlength="90" placeholder="e.g. Royal Maroon Mysore Silk Saree">
+      </div>
+      <div class="field">
+        <label for="edType">Type / fabric <small>(small label above the name)</small></label>
+        <input id="edType" name="type" maxlength="40" list="typeList" placeholder="e.g. Mysore Silk, Glass Bangles">
+        <datalist id="typeList"></datalist>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label for="edPrice">Selling price (₹)</label>
+          <input id="edPrice" name="price" type="number" inputmode="numeric" min="1" step="1" required placeholder="e.g. 2499">
+        </div>
+        <div class="field">
+          <label for="edMrp">Original price (₹) <small>optional</small></label>
+          <input id="edMrp" name="mrp" type="number" inputmode="numeric" min="1" step="1" placeholder="e.g. 2999">
+        </div>
+      </div>
+      <p class="fine left ed-off" id="edOff"></p>
+
+      <div class="field">
+        <label for="edDesc">Description</label>
+        <textarea id="edDesc" name="description" maxlength="600" placeholder="Colour, fabric, work, what it's perfect for…"></textarea>
+      </div>
+      <div class="field">
+        <label for="edDetails">Details <small>(one per line)</small></label>
+        <textarea id="edDetails" name="details" maxlength="600" placeholder="Fabric: Pure silk&#10;Length: 5.5 m + 0.8 m blouse piece&#10;Care: Dry clean only"></textarea>
+      </div>
+
+      <fieldset class="ed-block" id="sizeBlock">
+        <legend>Bangle sizes available</legend>
+        <div class="checks" id="edSizes"></div>
+      </fieldset>
+
+      <fieldset class="ed-block">
+        <legend>Colours <small>(for the colour filter and matching)</small></legend>
+        <div class="checks" id="edColors"></div>
+      </fieldset>
+
+      <fieldset class="ed-block">
+        <legend>Occasions</legend>
+        <div class="checks" id="edOcc"></div>
+      </fieldset>
+
+      <div class="field">
+        <label for="edBadge">Label on photo <small>optional</small></label>
+        <input id="edBadge" name="badge" maxlength="18" list="badgeList" placeholder="e.g. New, Bridal, Handloom">
+        <datalist id="badgeList"><option value="New"><option value="Bridal"><option value="Handloom"><option value="Wedding special"><option value="Limited stock"></datalist>
+      </div>
+
+      <div class="ed-block toggles">
+        <label class="switch-row"><span><strong>In stock</strong><small>Turn off to show "Sold out"</small></span><span class="switch"><input type="checkbox" name="inStock" checked><span></span></span></label>
+        <label class="switch-row"><span><strong>New arrival</strong><small>Shows first when customers sort by Newest</small></span><span class="switch"><input type="checkbox" name="isNew"><span></span></span></label>
+      </div>
+
+      <p class="form-error" id="edError" hidden></p>
+      <div class="ed-actions">
+        <button type="button" class="btn btn-outline danger" id="edDelete" hidden><span data-i="trash"></span> Delete</button>
+        <button type="submit" class="btn btn-primary grow" id="edSave">Save product</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="busy" id="busy" popover="manual" aria-live="assertive"><div class="busy-card"><div class="spinner" aria-hidden="true"></div><p id="busyText">Saving…</p><small>Please keep this page open</small></div></div>
+  <div class="toast" id="toast" popover="manual" role="status" aria-live="polite"></div>
+
+  <script src="js/shop-config.js"></script>
+  <script src="js/art.js"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>
