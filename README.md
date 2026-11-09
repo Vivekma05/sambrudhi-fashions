@@ -1,4 +1,4 @@
-# Sambrudhi Fashions: sarees and bangles website
+# Samruddhi Fashion: sarees and bangles website
 
 A ready-to-use shop website. Customers browse sarees, bangles and combos, filter them by occasion, colour and price, save favourites, and add items to a bag. At checkout the order is sent to **your WhatsApp** with the items, total and delivery address. They pay by UPI or cash on delivery.
 
@@ -56,7 +56,7 @@ The site is plain files, so any static host works:
 - **Netlify Drop (easiest):** go to app.netlify.com/drop and drag this whole folder onto the page. You get a link straight away. Create a free account to keep the site and update it later.
 - **GitHub Pages:** push this folder to a GitHub repository and turn on Pages in the repository settings.
 
-Both let you connect your own domain later (for example `sambrudhifashions.in`).
+Both let you connect your own domain later (for example `samruddhifashion.in`).
 
 ## How an order reaches you
 

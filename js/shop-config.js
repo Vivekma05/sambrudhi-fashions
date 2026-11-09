@@ -4,7 +4,7 @@
    ===================================================================== */
 window.SHOP = {
   // Your shop name and the small line shown under it in the logo
-  name: 'Sambrudhi Fashions',
+  name: 'Samruddhi Fashion',
   tagline: 'Sarees · Bangles',
 
   // Short code used in order numbers, e.g. SF-261109-4821
