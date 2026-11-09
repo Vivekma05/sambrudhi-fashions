@@ -1,0 +1,54 @@
+// Samruddhi Fashion — Android app (Trusted Web Activity).
+// The app opens the live website full-screen, so products, prices and
+// design changes appear in the app without publishing an update.
+plugins {
+    id 'com.android.application'
+}
+
+// Signing details for Play uploads live in android/keystore.properties (never commit it).
+def keystoreProps = new Properties()
+def keystorePropsFile = rootProject.file('keystore.properties')
+if (keystorePropsFile.exists()) {
+    keystorePropsFile.withInputStream { keystoreProps.load(it) }
+}
+
+android {
+    namespace 'com.samruddhifashion.shop'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'com.samruddhifashion.shop'
+        minSdk 24
+        targetSdk 36
+        // Increase versionCode by 1 for every upload to Play (2, 3, 4 …).
+        versionCode 1
+        versionName '1.0.0'
+    }
+
+    signingConfigs {
+        release {
+            if (keystoreProps['storeFile']) {
+                storeFile rootProject.file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.7.4'
+}

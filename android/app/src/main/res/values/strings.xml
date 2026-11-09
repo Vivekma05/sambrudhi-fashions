@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="appName">Samruddhi Fashion</string>
+    <string name="launcherName">Samruddhi</string>
+    <string name="launchUrl" translatable="false">https://vivekma05.github.io/sambrudhi-fashions/?source=app</string>
+    <string name="webManifestUrl" translatable="false">https://vivekma05.github.io/sambrudhi-fashions/manifest.webmanifest</string>
+    <string name="providerAuthority" translatable="false">com.samruddhifashion.shop.fileprovider</string>
+    <!-- Proves the app and the website belong together (must match /.well-known/assetlinks.json on the site). -->
+    <string name="assetStatements" translatable="false">[{\"relation\": [\"delegate_permission/common.handle_all_urls\"], \"target\": {\"namespace\": \"web\", \"site\": \"https://vivekma05.github.io\"}}]</string>
+</resources>

@@ -1,0 +1,9 @@
+# Android build files and secrets — never upload the signing key or its passwords
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/keystore.properties
+android/*.jks
+android/*.keystore
+android/release/

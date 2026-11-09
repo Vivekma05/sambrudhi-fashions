@@ -838,6 +838,10 @@
   }
 
   // ---- start ----------------------------------------------------------
+  // offline helper (also needed for the Android app); only on the live https site
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => { /* site still works without it */ }); });
+  }
   renderStatic();
   refresh();
   renderBag();
