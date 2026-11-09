@@ -24,7 +24,7 @@
       </a>
       <div class="header-actions">
         <a class="btn btn-outline btn-sm" href="index.html" target="_blank" rel="noopener">View shop</a>
-        <button type="button" class="icon-btn" id="logoutBtn" aria-label="Disconnect this phone" title="Disconnect this phone" hidden><span data-i="logout"></span></button>
+        <button type="button" class="icon-btn" id="lockBtn" aria-label="Lock the admin page" title="Lock" hidden><span data-i="lock"></span></button>
       </div>
     </div>
   </header>
@@ -41,16 +41,47 @@
         <li><strong>Repository access:</strong> Only select repositories → <strong id="repoName"></strong>.</li>
         <li><strong>Permissions:</strong> Repository permissions → <strong>Contents</strong> → <strong>Read and write</strong>.</li>
         <li>Tap <strong>Generate token</strong>, copy it, and paste it below.</li>
+        <li>Choose a <strong>PIN</strong>. You'll type it each time you open this page.</li>
       </ol>
       <form id="connectForm" class="connect-form">
         <div class="field">
           <label for="tokenInput">GitHub token</label>
           <input id="tokenInput" name="token" required autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="github_pat_…">
         </div>
+        <div class="row2">
+          <div class="field">
+            <label for="newPin">Choose a PIN <small>(4–8 digits)</small></label>
+            <input id="newPin" name="pin" class="pin-input" type="password" inputmode="numeric" autocomplete="new-password" maxlength="8" required>
+          </div>
+          <div class="field">
+            <label for="newPin2">Type the PIN again</label>
+            <input id="newPin2" name="pin2" class="pin-input" type="password" inputmode="numeric" autocomplete="new-password" maxlength="8" required>
+          </div>
+        </div>
         <p class="form-error" id="connectError" hidden></p>
-        <button type="submit" class="btn btn-primary btn-block">Connect</button>
-        <p class="fine">The key is saved only on this device. Anyone who has it can change your shop, so don't share it.</p>
+        <button type="submit" class="btn btn-primary btn-block" id="connectBtn">Connect</button>
+        <p class="fine">The key is saved only on this device, locked with your PIN. Anyone who has the key can change your shop, so don't share it.</p>
       </form>
+    </section>
+
+    <!-- ---------------- PIN lock ---------------- -->
+    <section id="pinView" class="connect pin-view" hidden>
+      <div class="pin-ico" aria-hidden="true"><span data-i="lock"></span></div>
+      <h1 id="pinTitle">Enter your PIN</h1>
+      <p class="muted" id="pinText">The admin page is locked. Type your PIN to manage products.</p>
+      <form id="pinForm" class="connect-form">
+        <div class="field">
+          <label for="pinInput" id="pinLabel">PIN</label>
+          <input id="pinInput" class="pin-input" type="password" inputmode="numeric" autocomplete="off" maxlength="8" required>
+        </div>
+        <div class="field" id="pin2Field" hidden>
+          <label for="pinInput2">Type the PIN again</label>
+          <input id="pinInput2" class="pin-input" type="password" inputmode="numeric" autocomplete="off" maxlength="8">
+        </div>
+        <p class="form-error" id="pinError" hidden></p>
+        <button type="submit" class="btn btn-primary btn-block" id="pinSubmit">Unlock</button>
+      </form>
+      <button type="button" class="link-btn" id="forgotPin">Forgot your PIN? Disconnect this phone</button>
     </section>
 
     <!-- ---------------- loading ---------------- -->
@@ -84,6 +115,7 @@
 
       <div class="plist" id="plist"></div>
       <p class="fine admin-foot">Changes show on the website about 1–2 minutes after saving. <span id="repoLine"></span></p>
+      <p class="admin-foot center"><button type="button" class="link-btn" id="disconnectBtn">Disconnect this phone</button></p>
     </section>
   </main>
 

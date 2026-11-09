@@ -16,7 +16,11 @@
 
   const PRODUCTS_PATH = 'js/products.js';
   const IMG_DIR = 'images/products/';
-  const TOKEN_KEY = 'shopAdmin.token';
+  const LEGACY_TOKEN_KEY = 'shopAdmin.token';   // plain token saved by the first version (moved into the PIN vault)
+  const VAULT_KEY = 'shopAdmin.vault';           // token encrypted with the PIN
+  const FAILS_KEY = 'shopAdmin.pinFails';
+  const MAX_PIN_FAILS = 5;
+  const LOCK_AFTER_MS = 10 * 60 * 1000;          // lock again after 10 minutes away from the page
   const MAX_PHOTOS = 6;
   const CATS = { sarees: 'Saree', bangles: 'Bangles', combos: 'Combo' };
   const OCCASIONS = ['Wedding', 'Festive', 'Party', 'Office', 'Daily'];
@@ -45,10 +49,37 @@
   const REPO = detectRepo();
 
   const st = { token: '', branch: 'main', head: '', products: [], cat: 'all', q: '' };
-  const tokenStore = {
-    get() { try { return localStorage.getItem(TOKEN_KEY) || ''; } catch { return ''; } },
-    set(v) { try { v ? localStorage.setItem(TOKEN_KEY, v) : localStorage.removeItem(TOKEN_KEY); } catch { /* storage blocked */ } }
+  const ls = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch { /* storage blocked */ } }
   };
+
+  // ---- PIN vault: the GitHub token is stored encrypted (AES-GCM, key from PIN via PBKDF2) --
+  const te = new TextEncoder(), td = new TextDecoder();
+  const toB64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
+  const fromB64Bytes = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  const cryptoOk = () => !!(window.crypto && crypto.subtle);
+
+  async function pinKey(pin, salt, iterations) {
+    const base = await crypto.subtle.importKey('raw', te.encode(pin), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  }
+  async function sealToken(token, pin) {
+    const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12)), iter = 310000;
+    const key = await pinKey(pin, salt, iter);
+    const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, te.encode(token));
+    return { v: 1, iter, salt: toB64(salt), iv: toB64(iv), ct: toB64(ct) };
+  }
+  async function openToken(vault, pin) {
+    const key = await pinKey(pin, fromB64Bytes(vault.salt), vault.iter);
+    return td.decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromB64Bytes(vault.iv) }, key, fromB64Bytes(vault.ct)));
+  }
+  function loadVault() { try { const v = JSON.parse(ls.get(VAULT_KEY)); return v && v.ct ? v : null; } catch { return null; } }
+  function pinProblem(pin, again) {
+    if (!/^\d{4,8}$/.test(pin)) return 'The PIN must be 4 to 8 numbers.';
+    if (again !== undefined && pin !== again) return "The two PINs don't match. Please type them again.";
+    return '';
+  }
 
   // ---- icons ----------------------------------------------------------------
   const svgI = inner => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${inner}</svg>`;
@@ -61,7 +92,7 @@
     trash: svgI('<path d="M4 7h16M9 7V5h6v2M6.5 7l1 12h9l1-12M10 11v5M14 11v5"/>'),
     camera: svgI('<path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>'),
     star: svgI('<path d="M12 4l2.4 5 5.4.6-4 3.7 1.1 5.4L12 16l-4.9 2.7 1.1-5.4-4-3.7 5.4-.6z"/>'),
-    logout: svgI('<path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/>')
+    lock: svgI('<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>')
   };
 
   // ---- GitHub API -------------------------------------------------------------
@@ -203,11 +234,12 @@ window.PRODUCTS = /*DATA*/${JSON.stringify(list, null, 2)}/*END*/;
 
   // ---- views -------------------------------------------------------------------
   function view(name) {
-    ['connectView', 'loadingView', 'listView'].forEach(v => { $('#' + v).hidden = v !== name; });
-    $('#logoutBtn').hidden = name !== 'listView';
+    ['connectView', 'pinView', 'loadingView', 'listView'].forEach(v => { $('#' + v).hidden = v !== name; });
+    $('#lockBtn').hidden = name !== 'listView';
   }
 
-  async function connect(token, fromForm) {
+  // Check the token with GitHub and load the products. Returns null on success, or the error.
+  async function openShop(token) {
     st.token = token;
     view('loadingView');
     $('#loadingText').textContent = 'Opening your products…';
@@ -217,32 +249,125 @@ window.PRODUCTS = /*DATA*/${JSON.stringify(list, null, 2)}/*END*/;
       const r = await loadRemote();
       st.head = r.head;
       st.products = r.products;
-      tokenStore.set(token);
       view('listView');
       renderList();
-      if (fromForm) toast('Connected! You can now add and edit products.');
+      return null;
     } catch (e) {
       console.error(e);
-      tokenStore.set('');
       st.token = '';
-      showConnect(friendly(e));
+      return e;
     }
   }
 
   function disconnect(message) {
-    tokenStore.set('');
+    ls.set(VAULT_KEY, null);
+    ls.set(LEGACY_TOKEN_KEY, null);
+    ls.set(FAILS_KEY, null);
     st.token = '';
+    if ($('#editor').open) $('#editor').close();
     showConnect(message || '');
+  }
+
+  function lock() {
+    st.token = '';
+    st.products = [];
+    $$('dialog[open]').forEach(d => d.close());
+    $('#plist').innerHTML = '';
+    showPin('unlock');
   }
 
   function showConnect(error) {
     const [owner, name] = REPO.split('/');
     $('#repoOwner').textContent = owner || 'your account';
     $('#repoName').textContent = name || 'your shop repository';
+    const f = $('#connectForm');
+    f.reset();
     const err = $('#connectError');
     err.textContent = error || '';
     err.hidden = !error;
     view('connectView');
+  }
+
+  let pinMode = 'unlock';   // 'unlock' = type PIN to open; 'create' = protect an already-saved token with a new PIN
+  function showPin(mode, error) {
+    pinMode = mode;
+    const create = mode === 'create';
+    $('#pinTitle').textContent = create ? 'Create a PIN' : 'Enter your PIN';
+    $('#pinText').textContent = create
+      ? 'Protect the admin page on this phone. You will type this PIN each time you open it.'
+      : 'The admin page is locked. Type your PIN to manage products.';
+    $('#pinLabel').textContent = create ? 'New PIN (4–8 numbers)' : 'PIN';
+    $('#pin2Field').hidden = !create;
+    $('#pinInput2').required = create;
+    $('#pinSubmit').textContent = create ? 'Save PIN' : 'Unlock';
+    $('#forgotPin').hidden = create;
+    $('#pinForm').reset();
+    const err = $('#pinError');
+    err.textContent = error || '';
+    err.hidden = !error;
+    view('pinView');
+    setTimeout(() => $('#pinInput').focus(), 50);
+  }
+
+  async function submitConnect(e) {
+    e.preventDefault();
+    const f = e.target;
+    const token = f.elements.token.value.trim();
+    const pin = f.elements.pin.value, pin2 = f.elements.pin2.value;
+    const err = $('#connectError');
+    const problem = !token ? 'Please paste your GitHub token.' : pinProblem(pin, pin2) || (cryptoOk() ? '' : 'This browser cannot lock the key with a PIN. Please open the admin page in Chrome or Safari.');
+    if (problem) { err.textContent = problem; err.hidden = false; return; }
+    const failure = await openShop(token);
+    if (failure) { showConnect(friendly(failure)); return; }
+    ls.set(VAULT_KEY, JSON.stringify(await sealToken(token, pin)));
+    ls.set(LEGACY_TOKEN_KEY, null);
+    ls.set(FAILS_KEY, null);
+    toast('Connected and locked with your PIN.');
+  }
+
+  async function submitPin(e) {
+    e.preventDefault();
+    const pin = $('#pinInput').value;
+    const err = $('#pinError');
+    const showErr = msg => { err.textContent = msg; err.hidden = false; $('#pinInput').value = ''; $('#pinInput').focus(); };
+    const btn = $('#pinSubmit');
+    const label = btn.textContent;
+
+    if (pinMode === 'create') {
+      const problem = pinProblem(pin, $('#pinInput2').value) || (cryptoOk() ? '' : 'This browser cannot lock the key with a PIN. Please open the admin page in Chrome or Safari.');
+      if (problem) return showErr(problem);
+      const token = ls.get(LEGACY_TOKEN_KEY) || '';
+      if (!token) return showConnect('');
+      btn.disabled = true; btn.textContent = 'Saving…';
+      ls.set(VAULT_KEY, JSON.stringify(await sealToken(token, pin)));
+      ls.set(LEGACY_TOKEN_KEY, null);
+      btn.disabled = false; btn.textContent = label;
+      const failure = await openShop(token);
+      if (failure) { failure.status === 401 ? disconnect(friendly(failure)) : showPin('unlock', friendly(failure)); return; }
+      toast('PIN saved. The admin page is now locked with it.');
+      return;
+    }
+
+    const vault = loadVault();
+    if (!vault) return showConnect('');
+    if (!/^\d{4,8}$/.test(pin)) return showErr('Type your PIN (4 to 8 numbers).');
+    btn.disabled = true; btn.textContent = 'Checking…';
+    let token = '';
+    try { token = await openToken(vault, pin); } catch { token = ''; }
+    btn.disabled = false; btn.textContent = label;
+    if (!token) {
+      const fails = (Number(ls.get(FAILS_KEY)) || 0) + 1;
+      if (fails >= MAX_PIN_FAILS) {
+        disconnect(`Too many wrong PINs, so this phone was disconnected for safety. Connect again with a GitHub token (and delete the old token on GitHub if you think someone else tried).`);
+        return;
+      }
+      ls.set(FAILS_KEY, String(fails));
+      const left = MAX_PIN_FAILS - fails;
+      return showErr(`Wrong PIN. ${left} ${left === 1 ? 'try' : 'tries'} left before this phone is disconnected.`);
+    }
+    ls.set(FAILS_KEY, null);
+    const failure = await openShop(token);
+    if (failure) { failure.status === 401 ? disconnect(friendly(failure)) : showPin('unlock', friendly(failure)); }
   }
 
   // ---- product list --------------------------------------------------------------
@@ -514,13 +639,22 @@ window.PRODUCTS = /*DATA*/${JSON.stringify(list, null, 2)}/*END*/;
 
   // ---- events ---------------------------------------------------------------------
   function bind() {
-    $('#connectForm').addEventListener('submit', e => {
-      e.preventDefault();
-      const t = $('#tokenInput').value.trim();
-      if (t) connect(t, true);
+    $('#connectForm').addEventListener('submit', submitConnect);
+    $('#pinForm').addEventListener('submit', submitPin);
+    $('#lockBtn').addEventListener('click', lock);
+    $('#disconnectBtn').addEventListener('click', () => {
+      if (confirm('Disconnect this phone? You will need a GitHub token and a new PIN to make changes here again.')) disconnect();
     });
-    $('#logoutBtn').addEventListener('click', () => {
-      if (confirm('Disconnect this phone? You will need the GitHub key again to make changes here.')) disconnect();
+    $('#forgotPin').addEventListener('click', () => {
+      if (confirm('Disconnect this phone? You will need to paste a GitHub token again and choose a new PIN.')) {
+        disconnect('Paste your GitHub token and choose a new PIN. If you no longer have the token, create a new one (and delete the old one on GitHub).');
+      }
+    });
+    // lock automatically after being away from the page for a while
+    let hiddenAt = 0;
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) { hiddenAt = Date.now(); return; }
+      if (st.token && hiddenAt && Date.now() - hiddenAt > LOCK_AFTER_MS && !$('#busy').classList.contains('show')) lock();
     });
     $('#addBtn').addEventListener('click', () => openEditor(null));
     $('#removeSamples').addEventListener('click', removeSamples);
@@ -564,8 +698,8 @@ window.PRODUCTS = /*DATA*/${JSON.stringify(list, null, 2)}/*END*/;
   $$('[data-i]').forEach(el => { el.outerHTML = ICON[el.dataset.i] || ''; });
   $('#repoLine').textContent = REPO ? `Saving to github.com/${REPO}.` : '';
   bind();
-  const saved = tokenStore.get();
   if (!REPO) showConnect('The repository is not set. Add githubRepo in js/shop-config.js.');
-  else if (saved) connect(saved, false);
+  else if (loadVault()) showPin('unlock');
+  else if (ls.get(LEGACY_TOKEN_KEY)) showPin('create');   // connected before PINs existed
   else showConnect('');
 })();

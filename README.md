@@ -70,9 +70,15 @@ images/products/      Product photos uploaded from the admin page
 2. Create a **fine-grained personal access token** on GitHub (Settings → Developer settings → Personal access tokens → Fine-grained tokens) with:
    - **Repository access:** only this repository
    - **Permissions:** Contents: *Read and write*
-3. Paste the token into the admin page and tap **Connect**.
+3. Paste the token into the admin page, choose a **PIN** (4–8 digits) and tap **Connect**.
 
-The token stays only on that device. Use **Disconnect** (top right) to remove it. If a token is lost or the device is shared, revoke the token on GitHub.
+**Security**
+- **PIN lock.** The token is stored only on that device, encrypted with the PIN (AES-GCM, key derived with PBKDF2).
+- **Unlocking.** The PIN is required each time the admin page is opened.
+- **Automatic lock.** The page locks itself after 10 minutes in the background. Use the padlock button to lock it at any time.
+- **Wrong PINs.** Five wrong PINs disconnect the device and erase the stored token.
+- **Removing access.** **Disconnect this phone** (at the bottom of the product list) removes the token from the device. If a device is lost, revoke the token on GitHub. It stops working immediately.
+- **Account protection.** Enable two-factor authentication on the GitHub account that owns this repository.
 
 ### Day-to-day
 - **Add product:** choose the category, add photos, fill in name and price, and tap **Save product**.
