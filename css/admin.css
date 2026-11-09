@@ -137,3 +137,6 @@
 .delete-box { border: 1px solid #f1c6c1; background: #fdf3f1; border-radius: var(--r); padding: 14px; display: grid; gap: 10px; }
 .delete-box .field { margin: 0; }
 .delete-box .select { width: 100%; height: 44px; border-radius: 12px; }
+.seg-add { grid-column: span 2; white-space: nowrap; display: flex; align-items: center; justify-content: center; gap: 6px; height: 46px; padding: 0 8px; border: 1.5px dashed var(--gold-2); border-radius: 12px; background: var(--ivory); color: var(--maroon); font-weight: 500; font-size: 14.5px; }
+.seg-add:hover { border-color: var(--maroon); }
+.seg-add .ico { width: 16px; height: 16px; }

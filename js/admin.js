@@ -454,7 +454,7 @@ window.PRODUCTS = window.SHOP_DATA.products;
     f.reset();
     const first = (st.categories[0] || {}).id;
     const cat = p && catOf(p.category) ? p.category : (!p && catOf(st.cat) ? st.cat : first);
-    $('#edCat').innerHTML = st.categories.map(c => `<label><input type="radio" name="category" value="${esc(c.id)}" ${c.id === cat ? 'checked' : ''}><span>${esc(c.name)}</span></label>`).join('');
+    renderEditorCats(cat);
     f.elements.name.value = p ? p.name : '';
     f.elements.type.value = p ? (p.type || '') : '';
     f.elements.price.value = p ? p.price : '';
@@ -478,6 +478,12 @@ window.PRODUCTS = window.SHOP_DATA.products;
     const d = $('#editor');
     if (!d.open) d.showModal();
     d.scrollTop = 0;
+  }
+
+  // category choices in the product form, plus a shortcut to create a new one
+  function renderEditorCats(selected) {
+    $('#edCat').innerHTML = st.categories.map(c => `<label><input type="radio" name="category" value="${esc(c.id)}" ${c.id === selected ? 'checked' : ''}><span>${esc(c.name)}</span></label>`).join('') +
+      `<button type="button" class="seg-add" data-new-cat>${ICON.plus} New category</button>`;
   }
 
   function currentCategory() { return ($('input[name="category"]:checked') || {}).value || (st.categories[0] || {}).id; }
@@ -772,6 +778,7 @@ window.PRODUCTS = window.SHOP_DATA.products;
     };
     const old = editingCat;
     let applySizes = false;
+    let newCatId = '';
     if (old && countIn(old.id) && JSON.stringify(old.sizes || []) !== JSON.stringify(fields.sizes)) {
       const n = countIn(old.id);
       const them = n === 1 ? `the 1 product` : `all ${n} products`;
@@ -794,12 +801,21 @@ window.PRODUCTS = window.SHOP_DATA.products;
             });
           }
         } else {
-          data.categories.push({ id: slugify(name, new Set(data.categories.map(c => c.id))), ...fields });
+          newCatId = slugify(name, new Set(data.categories.map(c => c.id)));
+          data.categories.push({ id: newCatId, ...fields });
         }
         return data;
       }));
       $('#catEditor').close();
-      toast(old ? 'Category saved.' : `"${name}" added. Add products to it and it appears on your website.`);
+      if ($('#editor').open) {
+        // came from the product form: refresh its category choices and select the new one
+        const keep = newCatId || currentCategory();
+        renderEditorCats(keep);
+        renderSizes(null);
+        toast(old ? 'Category saved.' : `"${name}" added and selected.`);
+      } else {
+        toast(old ? 'Category saved.' : `"${name}" added. Add products to it and it appears on your website.`);
+      }
     } catch (e) { onError(e); }
   }
 
@@ -882,6 +898,7 @@ window.PRODUCTS = window.SHOP_DATA.products;
       if (ds.phRemove) { photos.splice(Number(ds.phRemove), 1); renderPhotos(); return; }
       if (ds.phMain) { const [ph] = photos.splice(Number(ds.phMain), 1); photos.unshift(ph); renderPhotos(); return; }
       if (ds.catEdit) { openCatEditor(catOf(ds.catEdit)); return; }
+      if ('newCat' in ds) { openCatEditor(null); return; }
       if (ds.catMove) { moveCat(ds.id, Number(ds.catMove)); return; }
       if ('preset' in ds) { $('#ceSizes').value = ds.preset; return; }
     });
