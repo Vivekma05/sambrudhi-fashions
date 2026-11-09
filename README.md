@@ -111,6 +111,16 @@ All shop settings are in [`js/shop-config.js`](js/shop-config.js):
 
 ---
 
+## Android app
+
+The Play Store app (`com.samruddhifashion.shop`) is a **Trusted Web Activity**. It opens this website full-screen, so catalogue and design changes appear in the app without an app update. The site is installable as a Progressive Web App (`manifest.webmanifest`, `sw.js`). The service worker loads pages and the catalogue from the network first, so prices stay current.
+
+- **Source:** `android/` (Gradle, `androidbrowserhelper`). Build with `cd android && ./gradlew bundleRelease`.
+- **Signing:** the upload key (`android/upload-keystore.jks`, `android/keystore.properties`) is kept locally and is never committed.
+- **Verification:** the app is verified for the domain through `https://vivekma05.github.io/.well-known/assetlinks.json`. That file lives in the `vivekma05.github.io` repository and lists the app's signing certificate fingerprints.
+
+---
+
 ## Development
 
 No build step or dependencies are needed. To preview locally, open `index.html` in a browser.
